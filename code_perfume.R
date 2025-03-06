@@ -3,6 +3,9 @@ library(tidyverse)
 library(recipes)
 library(parsnip)
 library(rsample)
+library(rpart)
+library(rpart.plot)
+
 
 #Transform type into columns
 types <- strsplit(perfume_df$Type, ", ")
@@ -25,16 +28,16 @@ for (note in unique_notes){
 # clean the df and remove some columns
 perfume_df <- perfume_df %>% remove_rownames() %>% column_to_rownames(var = "Name")
 perfume_df <- perfume_df %>% select(-Type, -Notes, -Group)
+ 
 
-#bulding the model
-tree_model <- decision_tree() %>% 
-  set_engine("rpart") %>% 
-  set_mode("classification")
+# normalize Longevity and Sillage
+perfume_df_alternative <- perfume_df %>% 
+  mutate(Longevity = (Longevity - mean(Longevity))/sd(Longevity), Sillage = (Sillage - mean(Sillage))/sd(Sillage))
 
-# create the recipe and feature engineering 
-perfume_recipe <- recipe(Purchased ~., data = perfume_df) %>%
-  step_normalize(Longevity, Sillage)
+# tree model
 
-# Recipe training
-perfume_recipe_prep <- perfume_recipe %>% prep(training(perfume_df)) 
-
+model <- rpart(Purchased ~., data = perfume_df_alternative, method = "class")
+rpart.plot(model)
+real <- perfume_df_alternative$Purchased
+tree_pred <- (predict(model, perfume_df_alternative, type = "prob"))
+tree_pred_correction <- ifelse(tree_pred[, 2] >0.5, 1, 0)
